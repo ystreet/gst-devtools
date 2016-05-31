@@ -6,4 +6,10 @@ seek, name=Fast-forward-seek, playback-time="min(40.0, duration*0.25)", rate=16.
 seek, name=Fast-forward-seek, playback-time="min(80.0, duration*0.50)", rate=32.0, start=0.0, flags=flush+trickmode-key-units
 # and go back to regular playback
 seek, name=regular-playback, playback-time="min(160.0, duration*0.75)", rate=1.0, start=0.0, flags=flush
-stop, playback-time="min(10.0, duration*0.0625)"
+# And now some reverse \o/
+seek, name=Fast-backward-seek, playback-time=10.0,   rate=-2.0,  start=0.0, stop=310.0, flags=flush+trickmode-key-units
+seek, name=Fast-backward-seek, playback-time=300.0, rate=-4.0,  start=0.0, stop=310.0, flags=flush+trickmode-key-units
+seek, name=Fast-backward-seek, playback-time=280.0, rate=-8.0,  start=0.0, stop=310.0, flags=flush+trickmode-key-units
+seek, name=Fast-backward-seek, playback-time=240.0, rate=-16.0, start=0.0, stop=310.0, flags=flush+trickmode-key-units
+seek, name=Fast-backward-seek, playback-time=160.0, rate=-32.0, start=0.0, stop=310.0, flags=flush+trickmode-key-units
+#stop, playback-time="min(10.0, duration*0.0625)"

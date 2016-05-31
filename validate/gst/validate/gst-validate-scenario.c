@@ -1430,6 +1430,9 @@ _should_execute_action (GstValidateScenario * scenario, GstValidateAction * act,
     GstClockTime position, gdouble rate)
 {
 
+  GST_DEBUG_OBJECT (scenario, "position %" GST_TIME_FORMAT " rate %f",
+      GST_TIME_ARGS (position), rate);
+
   if (!act) {
     GST_DEBUG_OBJECT (scenario, "No action to execute");
 
@@ -2421,7 +2424,8 @@ message_cb (GstBus * bus, GstMessage * message, GstValidateScenario * scenario)
           priv->seeked_in_pause = TRUE;
 
         gst_event_replace (&priv->last_seek, NULL);
-        gst_validate_action_set_done (priv->actions->data);
+	if (priv->actions && priv->actions->data)
+	  gst_validate_action_set_done (priv->actions->data);
       } else if (scenario->priv->needs_async_done) {
         scenario->priv->needs_async_done = FALSE;
         if (priv->actions && _action_sets_state (priv->actions->data)

@@ -795,13 +795,13 @@ not been tested and explicitely activated if you set use --wanted-tests ALL""")
                 "seek_backward",
                 "seek_with_stop",
                 "switch_audio_track",
-                "switch_audio_track_while_paused",
                 "switch_subtitle_track",
                 "switch_subtitle_track_while_paused",
                 "trick_mode_seeks",
                 "disable_subtitle_track_while_paused",
                 "change_state_intensive",
-                "scrub_forward_seeking"])
+                "scrub_forward_seeking",
+                "trick_mode_seeks"])
         else:
             self.add_scenarios([
                 "play_15s",
@@ -811,13 +811,17 @@ not been tested and explicitely activated if you set use --wanted-tests ALL""")
                 "seek_backward",
                 "seek_with_stop",
                 "switch_audio_track",
-                "switch_audio_track_while_paused",
                 "switch_subtitle_track",
                 "switch_subtitle_track_while_paused",
                 "trick_mode_seeks",
                 "disable_subtitle_track_while_paused",
                 "change_state_intensive",
-                "scrub_forward_seeking"])
+                "scrub_forward_seeking",
+                "trick_mode_seeks"])
+        if os.getenv("USE_PLAYBIN3") is None:
+            self.add_scenarios([
+                "switch_audio_track_while_paused"
+            ])
 
     def register_default_encoding_formats(self):
         """
