@@ -798,6 +798,7 @@ not been tested and explicitely activated if you set use --wanted-tests ALL""")
                 "switch_audio_track_while_paused",
                 "switch_subtitle_track",
                 "switch_subtitle_track_while_paused",
+                "trick_mode_seeks",
                 "disable_subtitle_track_while_paused",
                 "change_state_intensive",
                 "scrub_forward_seeking"])
@@ -813,6 +814,7 @@ not been tested and explicitely activated if you set use --wanted-tests ALL""")
                 "switch_audio_track_while_paused",
                 "switch_subtitle_track",
                 "switch_subtitle_track_while_paused",
+                "trick_mode_seeks",
                 "disable_subtitle_track_while_paused",
                 "change_state_intensive",
                 "scrub_forward_seeking"])
