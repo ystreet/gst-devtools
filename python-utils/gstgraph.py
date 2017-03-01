@@ -1018,8 +1018,9 @@ class LogFigure:
         res["axes"] = res["figure"].get_axes()[0]
         return res
 
-    def __update_single_figure(self, fig, filter_dict={}, key_values=[]):
+    def __update_single_figure(self, figkey, filter_dict={}, key_values=[]):
         any_updated = False
+        fig = self.__figures[figkey]
         for p in self.datapoints:
             if p.has_updates():
                 if key_values is not []:
@@ -1027,10 +1028,18 @@ class LogFigure:
                         d = filter_dict
                         d[self.main_key] = k
                         print "Updating plots for", p, k
-                        pl = fig["plots"][(p, k)]
-                        pl.set_xdata(p.get_walltime(**d))
-                        pl.set_ydata(p.get_values(**d))
-                        any_updated = True
+                        xs = p.get_walltime(**d)
+                        ys = p.get_values(**d)
+                        if ys != []:
+                            if (p, k) in fig["plots"]:
+                                pl = fig["plots"][(p, k)]
+                                pl.set_xdata(xs)
+                                pl.set_ydata(ys)
+                            else:
+                                fig["plots"][(p,k)] = pylab.plot(xs, ys, label="%s %s" % (p.get_label(), k),
+                                                                 marker=p.get_marker(),
+                                                                 linestyle=p.get_linestyle())[0]
+                            any_updated = True
                 else:
                     print "Updating plots for", p
                     pl = fig["plots"][p]

@@ -22,6 +22,14 @@ import sys
 from gstgraph import LogFigure, LogGrapher, VDecLogData, ADecLogData, BaseSinkLogData, \
     AdaptiveDemuxData, Queue2LogData, DashDemuxData
 
+# Example usage of the gstgraph API
+#
+# This example will live plot the gstdebug log provided in input.
+#
+# # GST_DEBUG=2,*adaptiv*:8,*dash*:8,*decoder:6,*sink:6 GST_DEBUG_FILE=/tmp/log <anygstapp>
+# # python adaptivetrickmode.py /tmp/log
+#
+
 if __name__ == "__main__":
     # We want to extract data from various sources
     vdec = VDecLogData()
@@ -78,4 +86,5 @@ if __name__ == "__main__":
     grapher = LogGrapher([vf, vf2, vf3, vf5, vf6, vf7, vf8, vf9, vfx, vfy, vfd, vfu, vfz])
 
     print "Opening file for processing"
-    grapher.analyze_file(sys.argv[1])
+    # Use .analyze_file() if file won't grow
+    grapher.plot_live_log(sys.argv[1])
