@@ -26,7 +26,7 @@ from gstgraph import LogFigure, LogGrapher, VDecLogData, ADecLogData, BaseSinkLo
 #
 # This example will live plot the gstdebug log provided in input.
 #
-# # GST_DEBUG=2,*adaptiv*:8,*dash*:8,*decoder:6,*sink:6 GST_DEBUG_FILE=/tmp/log <anygstapp>
+# # GST_DEBUG=2,*adaptiv*:7,*dash*:7,*decoder:6,*sink:6 GST_DEBUG_FILE=/tmp/log <anygstapp>
 # # python adaptivetrickmode.py /tmp/log
 #
 
@@ -39,12 +39,10 @@ if __name__ == "__main__":
     queue2 = Queue2LogData()
     dash = DashDemuxData()
 
-    # And we want to have a figure with those input pts/dts
-    vf = LogFigure("Video Decoder", [
+    # Buffers being inputted, outputted and dropped in videodecoders
+    vf = LogFigure("Video Decoder (Input/Output/Dropped)", [
                    vdec.chain.pts, vdec.chain.dts, vdec.push.pts, vdec.dropped.pts, vdec.qos_dropped.pts], main_key_split=False)
     vf3 = LogFigure("Audio Decoder", [adec.chain.pts, adec.push.pts])
-    vf2 = LogFigure("VDec", [vdec.chain.size, vdec.chain.size.running_average(
-        10), vdec.chain.size.average()])
 
     # Demo with all elements combined in one
     # vf4 = LogFigure("Decoder diff", [vdec.push.pts.diff(vdec.chain.dts)])
@@ -57,33 +55,43 @@ if __name__ == "__main__":
     # adaptive demux test
     # vf6 = LogFigure("Adaptive Demux", [adapt.bitrate.bitrate])
 
-    vf7 = LogFigure("VDEC QoS", [vdec.qos.jitter])
+    # QoS jitter observed (by sinks), should always be below 0.0
+    # Corresponds to how "early" a frame arrived in the sink.
+    # If above 0.0 it arrived after the target render time
+    vf7 = LogFigure("Video QoS", [vdec.qos.jitter])
 
-    vfz = LogFigure("Sink rate", [sink.chain.start.derivate_time()])
+    # Concentrate in one single graph all positions we are interested in
+    # * video sink : The position and when a buffer arrives in it
+    # * adaptivedemux: The position of the current fragment and keyframe
+    # * dashdemux: The target time (keyframe which will be next requested/downloaded)
+    vf8 = LogFigure("Combined positions", [adapt.chainfirstbuf.pts, adapt.position.deadline,
+                                           adapt.position.position, adapt.fragment_request_time.timestamp,
+                                           sink.position.position, sink.chain.start,
+                                           dash.advance_position.position, vdec.chain.pts,
+                                           dash.target_time.target, dash.fragment_position.position])
 
-    vf8 = LogFigure("Adaptive Demux position", [adapt.chainfirstbuf.pts, adapt.position.deadline,
-                                                adapt.position.position, adapt.fragment_request_time.timestamp,
-                                                sink.position.position, sink.chain.start,
-                                                dash.advance_position.position, vdec.chain.pts,
-                                                dash.target_time.target, dash.fragment_position.position])
+    # Show the difference detected by adaptivedemux between current position
+    # and downstream target position
+    # vfu = LogFigure("Adaptive Demux diff", [dash.get_target_time.diff])
 
-    vfu = LogFigure("Adaptive Demux diff", [dash.get_target_time.diff])
+    # Observed bitrate per fragment/keyframe
+    vfy = LogFigure("AdaptiveDemux (Observed bitrate)", [adapt.bitrate.bitrate,
+                                                         adapt.bitrate.bitrate.sliding_average(3)])
 
-    vfy = LogFigure("Adaptive Demux bitrate", [adapt.bitrate.bitrate,
-                                               adapt.bitrate.bitrate.sliding_average(3)])
+    # Time taken to request and fully download keyframes
+    # This will be used to figure out target time to download in trick modes
+    # Also helps pointing out stray/persistent network behaviour
+    vfx = LogFigure("AdaptiveDemux (Download time)", [adapt.request_latency.latency, adapt.request_latency.latency.sliding_average(8, margin=2.0),
+                                                      dash.download_time.download_time, dash.download_time.average,
+                                                      adapt.position.deadline.diff(adapt.position.position).sliding_average(16)])
 
-    vfx = LogFigure("Adaptive Demux latencies", [adapt.request_latency.latency, adapt.request_latency.latency.sliding_average(8, margin=2.0),
-                                                 dash.download_time.download_time, dash.download_time.average,
-                                                 adapt.position.deadline.diff(adapt.position.position).sliding_average(16)])
-
-    vfd = LogFigure("Adaptive download", [adapt.chain.size.cumulative()])
+    # Amount of data downloaded by adaptivedemux
+    vfd = LogFigure("AdaptiveDemux (Amount downloaded)", [adapt.chain.size.cumulative()])
 
     vf9 = LogFigure("Queue2", [queue2.time_level.sink_time, queue2.time_level.src_time,
                                queue2.time_level.time_level], main_key_split=True)
-    # Demo with one sub-figure per element
-
     # Feed it, run it !
-    grapher = LogGrapher([vf, vf2, vf3, vf5, vf6, vf7, vf8, vf9, vfx, vfy, vfd, vfu, vfz])
+    grapher = LogGrapher([vf, vf3, vf5, vf6, vf7, vf8, vf9, vfx, vfy, vfd])
 
     print "Opening file for processing"
     # Use .analyze_file() if file won't grow
