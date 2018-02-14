@@ -28,6 +28,9 @@ import time
 # Number of nanoseconds in a second
 NS_PER_SECOND = 1000000000.0
 
+# 1-6 for android, 0 for desktop
+LOG_LINE_START = 6
+#LOG_LINE_START = 0
 
 def clocktime_to_float(valstr, defaultval=None):
     """Convert a string representing a GstClockTime or GstClockTimeDiff
@@ -50,6 +53,15 @@ def clocktime_to_float(valstr, defaultval=None):
 
     if h.startswith('-'):
         res = -res
+    return res
+
+
+def rtptime_to_float(valstr, clock_rate, defaultval=None):
+    """Convert a string representing a rtp time or diff
+    into the float equivalent in seconds.
+    """
+    res = float(valstr) / float(clock_rate)
+
     return res
 
 
@@ -409,7 +421,7 @@ class LogData:
     def analyze_line(self, line):
         if self.__matches(line):
             ls = line.split()
-            wt = clocktime_to_float(ls[0])
+            wt = clocktime_to_float(ls[LOG_LINE_START])
             if self.element_locator is not None:
                 element = ls[self.element_locator].split(
                     ':<')[-1].split('>')[0]
@@ -506,10 +518,12 @@ class VDecInLogData(LogData):
     vdecinsstart = []
     vdecinsstop = []
 
+    # -9 for 1.10, -10 for 1.12
     element_locator = -10
 
     def process(self, ls, **kwargs):
-        pts, dts = pts_or_dts(ls[-7][:-1], ls[-5])
+        # -7, -5 for 1.10, -9, -7 for 1.12
+        pts, dts = pts_or_dts(ls[-9][:-1], ls[-7])
         sz = int(ls[-1])
         self.append(pts=pts, dts=dts, size=sz, **kwargs)
 
@@ -538,6 +552,19 @@ class VDecDropLogData(LogData):
 
     def process(self, ls, **kwargs):
         self.append(pts=clocktime_to_float(ls[-8]), **kwargs)
+
+
+class VDecAMCDropLogData(LogData):
+    has_strings = ["gst_amc_video_dec_loop", "Frame is too late"]
+    entries = {
+        'deadline': {'description': "How far behind realtime are we",
+                'marker': 'o',
+                'linestyle': ''}
+    }
+    element_locator = -8
+
+    def process(self, ls, **kwargs):
+        self.append(deadline=clocktime_to_float(ls[-1][:-1]), **kwargs)
 
 
 class VDecOutLogData(LogData):
@@ -612,7 +639,8 @@ class VDecLogData(MultiLogData):
         'push': VDecOutLogData(),
         'qos': VDecQosData(),
         'dropped': VDecDropLogData(),
-        'qos_dropped': VDecDropQosLogData()
+        'qos_dropped': VDecDropQosLogData(),
+        'amc_dropped': VDecAMCDropLogData(),
     }
 
 
@@ -936,6 +964,120 @@ class DashDemuxData(MultiLogData):
     }
 
 
+class RtpJitterBufferInPacketData(LogData):
+    has_strings = ["gst_rtp_jitter_buffer_chain", "Received packet" ]
+    element_locator = -11
+    entries = {
+        "packet": {"description": "packet number received",
+                   "marker": 'x'},
+        "time": {"description": "time received",
+                 "marker": 'x'}
+    }
+
+    def process(self, ls, **kwargs):
+        # -8, -5 for > 1.8, -6, -3 for <= 1.8
+        self.append(packet=int(ls[-8][1:]),
+                    time=clocktime_to_float(ls[-5][:-1]), **kwargs)
+
+class RtpJitterBufferOutPacketData(LogData):
+    has_strings = ["pop_and_push_next", "Pushing buffer" ]
+    element_locator = -8
+    entries = {
+        "packet": {"description": "packet number pushed",
+                   "marker": 'x'},
+        "pts": {"description": "pts pushed",
+                "marker": 'x'},
+    }
+
+    def process(self, ls, **kwargs):
+        self.append(packet=int(ls[-5][:-1]),
+                    pts=clocktime_to_float(ls[-1][:-1]), **kwargs)
+
+class RtpJitterBufferPacketSpacingData(LogData):
+    has_strings = ["calculate_packet_spacing", "new packet spacing", "old packet spacing" ]
+    element_locator = -12
+    entries = {
+        "old": {"description": "old spacing",
+                   "marker": 'x'},
+        "new": {"description": "new spacing",
+                "marker": 'x'},
+    }
+
+    def process(self, ls, **kwargs):
+        self.append(old=clocktime_to_float(ls[-4]),
+                    new=clocktime_to_float(ls[-8]), **kwargs)
+
+class RtpJitterBufferData(MultiLogData):
+    subentries = {
+        'in_packet': RtpJitterBufferInPacketData(),
+        'out_packet': RtpJitterBufferOutPacketData(),
+        'spacing': RtpJitterBufferPacketSpacingData(),
+    }
+
+
+class RtspInterleavedHandleData(LogData):
+    has_strings = ["gst_rtspsrc_handle_data", "pushing data" ]
+    element_locator = -9
+    entries = {
+        "size": {"description": "size",
+                 "marker": 'x'},
+    }
+
+    def process(self, ls, **kwargs):
+        self.append(size=int(ls[-4]), **kwargs)
+
+class RtspInterleavedData(MultiLogData):
+    subentries = {
+        'data': RtspInterleavedHandleData(),
+    }
+
+class RtpSourceJitterStats(LogData):
+    has_strings = ["calculate_jitter", "rtparrival", "rtptime" ]
+    #element_locator = -7
+    entries = {
+        "rtparrival": {"description": "RTP arrival time",
+                       "marker": 'x'},
+        "rtptime": {"description": "RTP time",
+                    "marker": 'x'},
+        "jitter": {"description": "RTP jiter",
+                   "marker": 'x'},
+        "diff": {"description": "RTP jiter",
+                   "marker": 'x'},
+    }
+
+    def process(self, ls, **kwargs):
+        clock_rate = float(ls[-5][:-1])
+        self.append(jitter=float(ls[-1])/clock_rate,
+                    diff=float(ls[-3][:-1])/clock_rate,
+                    rtptime=float(ls[-7][:-1])/clock_rate,
+                    rtparrival=float(ls[-9][:-1])/clock_rate,
+                    **kwargs)
+
+class RtpSourceData(MultiLogData):
+    subentries = {
+        'jitter': RtpSourceJitterStats(),
+    }
+
+
+class H264ParseSliceTypeData(LogData):
+    has_strings = ["gst_h264_parse_process_nal", "slice type:" ]
+    #element_locator = -7
+    entries = {
+        "slice_type": {"description": "H.264 slice type",
+                       "marker": 'x',
+                       "linestyle": ''},
+    }
+
+    def process(self, ls, **kwargs):
+        self.append(slice_type=int(ls[-1]),
+                    **kwargs)
+
+class H264ParseData(MultiLogData):
+    subentries = {
+        'slice': H264ParseSliceTypeData(),
+    }
+
+
 class LogFigure:
     # base class for figures combining information from multiple extractors
     # Can produce one or more figure, with one or more subfigures within
@@ -1125,7 +1267,7 @@ class LogGrapher:
 
     def analyze_line(self, line):
         if '\r' in line[:-1]:
-            line = line.split('\r')[-1]
+            line = line.split('\r')[0]
         # find which logdata can analyze this
         for e in self.extracters:
             if e.analyze_line(line):
@@ -1138,7 +1280,7 @@ class LogGrapher:
         for f in self.figures:
             f.reinit_update()
         # update every second
-        pylab.pause(1)
+        pylab.pause(5)
 
     def analyze_file(self, filename):
         f = open(filename)
@@ -1146,7 +1288,7 @@ class LogGrapher:
             self.analyze_line(l)
         self.update_graphs()
         while True:
-            pylab.pause(1)
+            pylab.pause(10)
 
     def plot_live_log(self, filename):
         f = open(filename)
