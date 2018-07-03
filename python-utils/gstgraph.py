@@ -29,8 +29,8 @@ import time
 NS_PER_SECOND = 1000000000.0
 
 # 1-6 for android, 0 for desktop
-LOG_LINE_START = 6
-#LOG_LINE_START = 0
+#LOG_LINE_START = 6
+LOG_LINE_START = 0
 
 def clocktime_to_float(valstr, defaultval=None):
     """Convert a string representing a GstClockTime or GstClockTimeDiff
@@ -797,6 +797,64 @@ class BaseSinkLogData(MultiLogData):
         'qos': BaseSinkQosLogData(),
         'perform_qos': BaseSinkPerformQosLogData(),
         'position': BaseSinkQueryPosition()
+    }
+
+
+class DeckLinkVideoSinkScheduling(LogData):
+    has_strings = ["Scheduling video frame "]
+    entries = {'position': {'description': "Frame position"},
+               'duration': {'description': "Frame duration"}}
+    element_locator = -9
+
+    def process(self, ls, **kwargs):
+        self.append(position=clocktime_to_float(ls[-4], 0), duration=clocktime_to_float(ls[-1], 0), **kwargs)
+
+class DeckLinkVideoSinkClockSkew(LogData):
+    has_strings = ["gst_decklink_video_sink_convert_to_internal_clock", " Converted 0"]
+    entries = {'upstream': {'description': "From"},
+               'result': {'description': "Frame Duration"},
+               'internal': {'description': "Frame position"},
+               'external': {'description': "Frame Duration"},
+               'rate': {'description': "rate"}}
+    element_locator = -11
+
+    def process(self, ls, **kwargs):
+        self.append(upstream=clocktime_to_float(ls[-9], 0),
+            result=clocktime_to_float(ls[-7], 0),
+            internal=clocktime_to_float(ls[-5], 0),
+            external=clocktime_to_float(ls[-3], 0),
+            rate=float(ls[-1][:-1]),
+            **kwargs)
+
+class DeckLinkVideoSinkFrameCompletion(LogData):
+    has_strings = ["ScheduledFrameCompleted"]
+    entries = {'completed': {'description': "Completed", 'marker' : 'o'},
+               'dropped': {'description': "Dropped", 'marker' : 'x'},
+               'flushed': {'description': "Flushed", 'marker' : '+'},
+               'late': {'description': "Late", 'marker' : '<'},
+               'unknown': {'description': "Unknown", 'marker' : '*'},}
+    element_locator = -4
+
+    def process(self, ls, **kwargs):
+#        print (ls)
+        if ls[-3] == "Completed":
+            self.append(completed=clocktime_to_float(ls[-11], 0), dropped=0, flushed=0, late=0, unknown=0, **kwargs)
+        elif ls[-3] == "Dropped":
+            self.append(completed=0, dropped=clocktime_to_float(ls[-11], 0), flushed=0, late=0, unknown=0, **kwargs)
+        elif ls[-3] == "Flushed":
+            self.append(completed=0, dropped=0, flushed=clocktime_to_float(ls[-11], 0), late=0, unknown=0, **kwargs)
+        elif ls[-3] == "Late":
+            self.append(completed=0, dropped=0, flushed=0, late=clocktime_to_float(ls[-11], 0), unknown=0, **kwargs)
+        elif ls[-3] == "Unknown":
+            self.append(completed=0, dropped=0, flushed=0, late=0, unknown=clocktime_to_float(ls[-11], 0), **kwargs)
+        else:
+            self.append(late=0, **kwargs)
+
+class DeckLinkVideoSinkLogData(MultiLogData):
+    subentries = {
+        'scheduling': DeckLinkVideoSinkScheduling(),
+        'clock_skew': DeckLinkVideoSinkClockSkew(),
+        'completion' : DeckLinkVideoSinkFrameCompletion(),
     }
 
 
